@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fernwick Support Agent</title>
+  <meta name="description" content="A customer support AI agent with tool use, policy guardrails, and an evaluation suite.">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">▲</span>
+      <div>
+        <div class="brand-name">Fernwick Outfitters</div>
+        <div class="brand-sub">AI support agent · live demo with a fictional store</div>
+      </div>
+    </div>
+    <a class="gh" href="https://github.com/rohanswami08/fernwick-support-agent" target="_blank" rel="noopener">View code on GitHub</a>
+  </header>
+
+  <main class="layout">
+    <section class="chat" aria-label="Chat with the support agent">
+      <div id="messages" class="messages" aria-live="polite">
+        <div class="msg agent">
+          <div class="bubble">Hi, I'm Fern, Fernwick's support assistant. I can help with orders, returns, shipping, and product questions. What can I do for you?</div>
+        </div>
+      </div>
+      <form id="composer" class="composer">
+        <textarea id="input" rows="1" maxlength="1000" placeholder="Type a message…" aria-label="Message"></textarea>
+        <button id="send" type="submit">Send</button>
+      </form>
+      <div class="chat-foot">
+        <span id="status" class="status"></span>
+        <button id="reset" class="link-btn" type="button">Reset conversation</button>
+      </div>
+    </section>
+
+    <aside class="side">
+      <nav class="tabs" role="tablist">
+        <button class="tab active" role="tab" data-tab="try" aria-selected="true">Try it</button>
+        <button class="tab" role="tab" data-tab="trace" aria-selected="false">Agent trace <span id="trace-count" class="count">0</span></button>
+      </nav>
+
+      <div id="tab-try" class="panel">
+        <p class="hint">Every conversation gets its own copy of the store, so go ahead and cancel things. Store date is <b id="today">…</b>.</p>
+        <h3>Things to try</h3>
+        <div id="scenarios" class="chips"></div>
+        <h3>Demo customers</h3>
+        <div id="accounts" class="accounts"></div>
+      </div>
+
+      <div id="tab-trace" class="panel hidden">
+        <p class="hint">Every tool the agent calls, with its input and result. Red entries are blocked by a policy guardrail in code.</p>
+        <div id="state" class="state"></div>
+        <ol id="trace" class="trace"></ol>
+      </div>
+    </aside>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

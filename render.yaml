@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: fernwick-support-agent
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: AGENT_MODEL
+        value: claude-sonnet-5
+      - key: DAILY_MESSAGE_CAP
+        value: "1000"
