@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: fernwick-support-agent
+    name: campcrew-support-agent
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
