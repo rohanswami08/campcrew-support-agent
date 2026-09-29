@@ -92,11 +92,40 @@ def _get_session(session_id: str) -> dict:
         return session
 
 
+def _accounts(store: Store) -> list[dict]:
+    """Demo customers and their orders as they stand in this store.
+
+    `changed` marks orders whose status differs from the starting data, so the
+    sidebar can highlight what the agent just did.
+    """
+    seed = Store()
+    by_customer = defaultdict(list)
+    for o in store.orders.values():
+        original = seed.orders[o["id"]]
+        notes = []
+        if any(i["status"] == "return_started" != s["status"] for i, s in zip(o["items"], original["items"])):
+            notes.append("return started")
+        if o["shipping_address"] != original["shipping_address"]:
+            notes.append("address updated")
+        if any(c["order_id"] == o["id"] for c in store.credits):
+            notes.append("credit issued")
+        if any(t["order_id"] == o["id"] for t in store.tickets):
+            notes.append("escalated")
+        by_customer[o["customer_id"]].append({
+            "id": o["id"],
+            "status": ", ".join([o["status"], *notes]),
+            "changed": o["status"] != original["status"] or bool(notes),
+        })
+    return [{"name": c["name"], "email": c["email"], "zip": c["zip"], "orders": by_customer[c["id"]]}
+            for c in store.customers.values()]
+
+
 def _state_snapshot(agent: SupportAgent) -> dict:
     return {
         "verified_customer": (agent.store.customers[agent.tools.verified_customer_id]["name"]
                               if agent.tools.verified_customer_id else None),
         "actions": agent.store.actions,
+        "accounts": _accounts(agent.store),
     }
 
 
@@ -131,13 +160,7 @@ def reset(req: ResetRequest):
 def demo_accounts():
     """Sample logins shown in the UI so visitors can try real scenarios."""
     store = Store()
-    by_customer = defaultdict(list)
-    for o in store.orders.values():
-        by_customer[o["customer_id"]].append(f'{o["id"]} ({o["status"]})')
-    return {"today": store.today.isoformat(), "accounts": [
-        {"name": c["name"], "email": c["email"], "zip": c["zip"], "orders": by_customer[c["id"]]}
-        for c in store.customers.values()
-    ]}
+    return {"today": store.today.isoformat(), "accounts": _accounts(store)}
 
 
 @app.get("/healthz")

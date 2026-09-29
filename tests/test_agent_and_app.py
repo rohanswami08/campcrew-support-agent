@@ -95,6 +95,28 @@ def test_web_app(monkeypatch):
     assert c.post("/api/reset", json={"session_id": "session-abc"}).json()["ok"]
 
 
+def test_sidebar_reflects_this_conversation(monkeypatch):
+    import app as webapp
+
+    fake = FakeClient([
+        [tool_use("t1", "verify_customer", {"email": "jordan.alvarez@example.com", "zip_code": "80302"})],
+        [tool_use("t2", "cancel_order", {"order_id": "FW-10455", "reason": "customer request"})],
+        [text("Cancelled.")],
+    ])
+    monkeypatch.setattr(webapp, "get_client", lambda: fake)
+    c = TestClient(webapp.app)
+
+    start = {a["name"]: a for a in c.get("/api/demo-accounts").json()["accounts"]}
+    assert start["Jordan Alvarez"]["orders"][0] == {"id": "FW-10455", "status": "processing", "changed": False}
+
+    state = c.post("/api/chat", json={"session_id": "session-sidebar", "message": "yes cancel"}).json()["state"]
+    jordan = next(a for a in state["accounts"] if a["name"] == "Jordan Alvarez")
+    assert jordan["orders"][0] == {"id": "FW-10455", "status": "cancelled", "changed": True}
+    assert not any(o["changed"] for a in state["accounts"] if a["name"] != "Jordan Alvarez" for o in a["orders"])
+    # other visitors still see the original store
+    assert c.get("/api/demo-accounts").json()["accounts"][1]["orders"][0]["status"] == "processing"
+
+
 def test_web_app_without_key_returns_503(monkeypatch):
     import app as webapp
 

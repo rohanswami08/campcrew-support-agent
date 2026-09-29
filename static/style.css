@@ -115,6 +115,9 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.6px; color: v
 .account b { display: block; }
 .account code { font-family: var(--mono); font-size: 12px; }
 .account .orders { color: var(--muted); }
+.account.has-changes { border-color: var(--accent); }
+.account .order.changed { color: var(--text); font-weight: 600; }
+.account .order.changed::before { content: "● "; color: var(--accent); }
 
 .state { font-size: 13px; margin-bottom: 10px; }
 .state .pill { display: inline-block; padding: 2px 8px; border-radius: 10px; background: var(--ok-bg); margin: 2px 4px 2px 0; }

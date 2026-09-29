@@ -104,6 +104,7 @@ async function send(text) {
     addToolsUsed(data.trace);
     renderTrace(data.trace);
     renderState(data.state);
+    if (data.state.accounts) renderAccounts(data.state.accounts);
   } catch (err) {
     typing.remove();
     addMessage("agent", err.message, "error");
@@ -120,6 +121,7 @@ async function reset() {
   $("trace").innerHTML = ""; $("state").innerHTML = ""; $("trace-count").textContent = "0";
   messagesEl.querySelectorAll(".msg:not(:first-child), .tools-used").forEach((n) => n.remove());
   statusEl.textContent = "Started a fresh conversation and store.";
+  loadAccounts();
 }
 
 function autosize() {
@@ -127,20 +129,33 @@ function autosize() {
   input.style.height = Math.min(input.scrollHeight, 140) + "px";
 }
 
+// Shows each demo customer's orders as they stand in *this* conversation's store.
+// Orders the agent has changed are highlighted.
+function renderAccounts(accounts) {
+  const box = $("accounts");
+  box.innerHTML = "";
+  for (const a of accounts) {
+    const div = document.createElement("div");
+    div.className = "account" + (a.orders.some((o) => o.changed) ? " has-changes" : "");
+    div.innerHTML = `<b></b><code></code><div class="orders"></div>`;
+    div.querySelector("b").textContent = a.name;
+    div.querySelector("code").textContent = `${a.email} · ${a.zip}`;
+    const orders = div.querySelector(".orders");
+    for (const o of a.orders) {
+      const line = document.createElement("div");
+      line.className = "order" + (o.changed ? " changed" : "");
+      line.textContent = `${o.id} (${o.status})`;
+      orders.appendChild(line);
+    }
+    box.appendChild(div);
+  }
+}
+
 async function loadAccounts() {
   try {
     const data = await (await fetch("/api/demo-accounts")).json();
     $("today").textContent = data.today;
-    const box = $("accounts");
-    for (const a of data.accounts) {
-      const div = document.createElement("div");
-      div.className = "account";
-      div.innerHTML = `<b></b><code></code><div class="orders"></div>`;
-      div.querySelector("b").textContent = a.name;
-      div.querySelector("code").textContent = `${a.email} · ${a.zip}`;
-      div.querySelector(".orders").textContent = a.orders.join(", ");
-      box.appendChild(div);
-    }
+    renderAccounts(data.accounts);
   } catch { /* sidebar is optional */ }
 }
 
