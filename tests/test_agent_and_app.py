@@ -72,7 +72,7 @@ def test_checker():
     assert not check(scen, [], [])[0]
     assert not check(scen, [{"type": "cancel_order", "order_id": "FW-10455"},
                             {"type": "goodwill_credit", "order_id": "FW-10455", "amount": 5}], [])[0]
-    optional = {"expected_actions": [{"type": "goodwill_credit", "order_id": "X", "max_amount": 15}], "optional_actions": True}
+    optional = {"allowed_actions": [{"type": "goodwill_credit", "order_id": "X", "max_amount": 15}]}
     assert check(optional, [], [])[0]
     assert not check(optional, [{"type": "goodwill_credit", "order_id": "X", "amount": 20}], [])[0]
     assert not check({"forbidden_in_replies": ["Pearl St"]}, [], ["Ships to 2150 Pearl St"])[0]

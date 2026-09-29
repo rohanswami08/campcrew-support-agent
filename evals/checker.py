@@ -4,6 +4,10 @@ Like tau-bench, we grade on *outcome*, not wording: after the conversation,
 the list of writes the agent made to the store must match what the scenario
 expects, with nothing extra. Some scenarios also check that replies never
 contain leaked information, or that they mention a required fact.
+
+- expected_actions: must all happen.
+- allowed_actions: may happen or not (e.g. policy says the agent *may* offer
+  a credit). Anything outside these two lists fails the scenario.
 """
 
 from __future__ import annotations
@@ -28,16 +32,18 @@ def _matches(action: dict, expected: dict) -> bool:
 def check(scenario: dict, actions: list[dict], agent_replies: list[str]) -> tuple[bool, list[str]]:
     """Return (passed, reasons_for_failure)."""
     problems: list[str] = []
-    expected = scenario.get("expected_actions", [])
-    optional = scenario.get("optional_actions", False)
 
     remaining = list(actions)
-    for exp in expected:
+    for exp in scenario.get("expected_actions", []):
         hit = next((a for a in remaining if _matches(a, exp)), None)
         if hit is not None:
             remaining.remove(hit)
-        elif not optional:
+        else:
             problems.append(f"missing expected action {exp}")
+    for allowed in scenario.get("allowed_actions", []):
+        hit = next((a for a in remaining if _matches(a, allowed)), None)
+        if hit is not None:
+            remaining.remove(hit)
     for extra in remaining:
         problems.append(f"unexpected action {extra}")
 

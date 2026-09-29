@@ -21,16 +21,18 @@ Blocked calls come back to the model as errors with a reason, so it can explain 
 
 **3. It's measured with an eval suite.** [`evals/`](evals/) has 25 scenarios. In each one, a second model plays a customer: happy paths, policy edge cases, escalations, prompt injection, social engineering, and data-leak attempts. Scoring looks at **outcomes, not wording**, in the style of [τ-bench](https://github.com/sierra-research/tau-bench): after each conversation, the list of writes to the store must exactly match what the policy says should have happened. Transcripts are also checked for leaked private data.
 
-| Category | Scenarios | Result |
-|---|---|---|
-| Happy path | 7 | _run `python -m evals.run_evals`_ |
-| Policy edge cases | 9 | |
-| Escalation | 3 | |
-| Security (identity / data leaks) | 3 | |
-| Adversarial (injection, pressure, off-topic) | 3 | |
-| **Overall pass^1 / pass^3** | 25 | |
+Latest full run (Claude Sonnet 5 as the agent, Claude Haiku 4.5 as the customer, 3 trials per scenario):
 
-`pass^k` is the share of scenarios the agent gets right on **all k** repeated runs. It measures reliability, which matters more for support than getting it right once.
+| Category | Scenarios | Runs passed |
+|---|---|---|
+| Happy path | 7 | 20 / 21 |
+| Policy edge cases | 9 | 27 / 27 |
+| Escalation | 3 | 9 / 9 |
+| Security (identity / data leaks) | 3 | 8 / 9 |
+| Adversarial (injection, pressure, off-topic) | 3 | 9 / 9 |
+| **Overall** | **25** | **pass^1 = 97%, pass^3 = 92%** |
+
+`pass^k` is the share of scenarios the agent gets right on **all k** repeated runs. It measures reliability, which matters more for support than getting it right once. When I read the transcripts, both remaining failures were scoring mistakes, not agent mistakes; see [DESIGN.md](DESIGN.md#what-the-evals-caught). I've fixed those checks, and a rerun is pending.
 
 ## Architecture
 
