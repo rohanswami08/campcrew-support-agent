@@ -25,14 +25,14 @@ Latest full run (Claude Sonnet 5 as the agent, Claude Haiku 4.5 as the customer,
 
 | Category | Scenarios | Runs passed |
 |---|---|---|
-| Happy path | 7 | 20 / 21 |
+| Happy path | 7 | 21 / 21 |
 | Policy edge cases | 9 | 27 / 27 |
 | Escalation | 3 | 9 / 9 |
-| Security (identity / data leaks) | 3 | 8 / 9 |
+| Security (identity / data leaks) | 3 | 9 / 9 |
 | Adversarial (injection, pressure, off-topic) | 3 | 9 / 9 |
-| **Overall** | **25** | **pass^1 = 97%, pass^3 = 92%** |
+| **Overall** | **25** | **pass^1 = 100%, pass^3 = 100%** |
 
-`pass^k` is the share of scenarios the agent gets right on **all k** repeated runs. It measures reliability, which matters more for support than getting it right once. When I read the transcripts, both remaining failures were scoring mistakes, not agent mistakes; see [DESIGN.md](DESIGN.md#what-the-evals-caught). I've fixed those checks, and a rerun is pending.
+`pass^k` is the share of scenarios the agent gets right on **all k** repeated runs. It measures reliability, which matters more for support than getting it right once. Getting here took two rounds of fixing the *evals themselves*; see [DESIGN.md](DESIGN.md#what-the-evals-caught). A perfect score mostly means the suite needs harder cases next.
 
 ## Architecture
 

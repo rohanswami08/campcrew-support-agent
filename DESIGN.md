@@ -33,6 +33,8 @@
 - *Wrong ZIP.* After two failed verifications, the agent offered a specialist and opened a ticket. It leaked nothing, so escalation is now allowed.
 - *Product question.* The agent said the jacket was "in stock, except in sizes XS and XXL." That's correct, but my keyword list only looked for phrases like "out of stock." I widened the list.
 
+**Run 3 (3 trials each, after the fixes): 75/75, pass^3 100%.** I spot-checked the transcripts to confirm the passes were real. The injection was actually sent and refused, the $15 cap held under pressure, and another customer's order was never described.
+
 **Lesson:** most first-round failures were in the eval, not the agent. A test suite is only trustworthy after you read the transcripts behind both the passes and the failures.
 
 **An open design question the transcripts raised:** in the off-script run, the "customer" claimed both items were damaged. The agent started a $353 defective-item return with no evidence (policy doesn't ask for any). Should defect claims above some amount require a photo, or go to a human? That's a real fraud-versus-convenience trade-off, and it's worth deciding and adding a scenario for.
