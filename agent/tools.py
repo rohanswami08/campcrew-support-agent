@@ -46,7 +46,7 @@ TOOL_SCHEMAS: list[dict] = [
                        "status, dates, address, tracking, and any open returns.",
         "input_schema": {
             "type": "object",
-            "properties": {"order_id": {"type": "string", "description": "e.g. FW-10421"}},
+            "properties": {"order_id": {"type": "string", "description": "e.g. CC-10421"}},
             "required": ["order_id"],
         },
     },

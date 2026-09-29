@@ -89,7 +89,7 @@ class Store:
                 item["status"] = "return_started"
         self.actions.append({"type": "start_return", "order_id": order_id, "line_ids": sorted(line_ids),
                              "reason": reason, "refund": refund})
-        return {**rma, "label_url": f"https://returns.fernwick.example/{rma['return_id']}.pdf"}
+        return {**rma, "label_url": f"https://returns.campcrew.example/{rma['return_id']}.pdf"}
 
     def add_credit(self, customer_id: str, order_id: str, amount: float, reason: str) -> dict:
         credit = {"customer_id": customer_id, "order_id": order_id, "amount": amount, "reason": reason}

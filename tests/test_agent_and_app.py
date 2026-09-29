@@ -33,7 +33,7 @@ class FakeClient:
 def test_agent_runs_tools_then_answers():
     client = FakeClient([
         [tool_use("t1", "verify_customer", {"email": "jordan.alvarez@example.com", "zip_code": "80302"})],
-        [tool_use("t2", "cancel_order", {"order_id": "FW-10455", "reason": "customer request"})],
+        [tool_use("t2", "cancel_order", {"order_id": "CC-10455", "reason": "customer request"})],
         [text("Done! Your order is cancelled.")],
     ])
     agent = SupportAgent(client, Store(), model="test")
@@ -49,11 +49,11 @@ def test_agent_runs_tools_then_answers():
 
 def test_blocked_tool_is_reported_as_error():
     client = FakeClient([
-        [tool_use("t1", "cancel_order", {"order_id": "FW-10455", "reason": "x"})],
+        [tool_use("t1", "cancel_order", {"order_id": "CC-10455", "reason": "x"})],
         [text("I need to verify you first.")],
     ])
     agent = SupportAgent(client, Store(), model="test")
-    agent.respond("cancel FW-10455")
+    agent.respond("cancel CC-10455")
     result_block = client.requests[-1]["messages"][-1]["content"][0]
     assert result_block["is_error"] is True
     assert agent.store.actions == []
@@ -67,11 +67,11 @@ def test_runaway_tool_loop_stops():
 
 
 def test_checker():
-    scen = {"expected_actions": [{"type": "cancel_order", "order_id": "FW-10455"}]}
-    assert check(scen, [{"type": "cancel_order", "order_id": "FW-10455"}], [])[0]
+    scen = {"expected_actions": [{"type": "cancel_order", "order_id": "CC-10455"}]}
+    assert check(scen, [{"type": "cancel_order", "order_id": "CC-10455"}], [])[0]
     assert not check(scen, [], [])[0]
-    assert not check(scen, [{"type": "cancel_order", "order_id": "FW-10455"},
-                            {"type": "goodwill_credit", "order_id": "FW-10455", "amount": 5}], [])[0]
+    assert not check(scen, [{"type": "cancel_order", "order_id": "CC-10455"},
+                            {"type": "goodwill_credit", "order_id": "CC-10455", "amount": 5}], [])[0]
     optional = {"allowed_actions": [{"type": "goodwill_credit", "order_id": "X", "max_amount": 15}]}
     assert check(optional, [], [])[0]
     assert not check(optional, [{"type": "goodwill_credit", "order_id": "X", "amount": 20}], [])[0]
@@ -100,18 +100,18 @@ def test_sidebar_reflects_this_conversation(monkeypatch):
 
     fake = FakeClient([
         [tool_use("t1", "verify_customer", {"email": "jordan.alvarez@example.com", "zip_code": "80302"})],
-        [tool_use("t2", "cancel_order", {"order_id": "FW-10455", "reason": "customer request"})],
+        [tool_use("t2", "cancel_order", {"order_id": "CC-10455", "reason": "customer request"})],
         [text("Cancelled.")],
     ])
     monkeypatch.setattr(webapp, "get_client", lambda: fake)
     c = TestClient(webapp.app)
 
     start = {a["name"]: a for a in c.get("/api/demo-accounts").json()["accounts"]}
-    assert start["Jordan Alvarez"]["orders"][0] == {"id": "FW-10455", "status": "processing", "changed": False}
+    assert start["Jordan Alvarez"]["orders"][0] == {"id": "CC-10455", "status": "processing", "changed": False}
 
     state = c.post("/api/chat", json={"session_id": "session-sidebar", "message": "yes cancel"}).json()["state"]
     jordan = next(a for a in state["accounts"] if a["name"] == "Jordan Alvarez")
-    assert jordan["orders"][0] == {"id": "FW-10455", "status": "cancelled", "changed": True}
+    assert jordan["orders"][0] == {"id": "CC-10455", "status": "cancelled", "changed": True}
     assert not any(o["changed"] for a in state["accounts"] if a["name"] != "Jordan Alvarez" for o in a["orders"])
     # other visitors still see the original store
     assert c.get("/api/demo-accounts").json()["accounts"][1]["orders"][0]["status"] == "processing"

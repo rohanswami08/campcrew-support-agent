@@ -1,5 +1,5 @@
 {
-  "store_name": "Fernwick Outfitters",
+  "store_name": "CampCrew",
   "today": "2026-09-26",
   "products": [
     {"sku": "TNT-TRL3", "name": "Trailhead 3P Tent", "category": "tents", "price": 329.00, "in_stock": 14, "final_sale": false,
@@ -36,72 +36,72 @@
     {"id": "C006", "name": "Marcus Lee", "email": "marcus.lee@example.com", "zip": "30307"}
   ],
   "orders": [
-    {"id": "FW-10421", "customer_id": "C001", "status": "delivered", "placed": "2026-09-08",
+    {"id": "CC-10421", "customer_id": "C001", "status": "delivered", "placed": "2026-09-08",
      "estimated_delivery": "2026-09-13", "delivered": "2026-09-12", "shipping_cost": 0.00,
      "shipping_address": "418 Valencia St, San Francisco, CA 94110",
      "items": [
        {"line_id": "L1", "sku": "TNT-TRL3", "qty": 1, "unit_price": 329.00, "status": "delivered"},
        {"line_id": "L2", "sku": "ACC-STK8", "qty": 1, "unit_price": 24.00, "status": "delivered"}
      ]},
-    {"id": "FW-10388", "customer_id": "C001", "status": "delivered", "placed": "2026-06-27",
+    {"id": "CC-10388", "customer_id": "C001", "status": "delivered", "placed": "2026-06-27",
      "estimated_delivery": "2026-07-03", "delivered": "2026-07-02", "shipping_cost": 6.95,
      "shipping_address": "418 Valencia St, San Francisco, CA 94110",
      "items": [
        {"line_id": "L1", "sku": "LGT-HL400", "qty": 1, "unit_price": 45.00, "status": "delivered"}
      ]},
-    {"id": "FW-10455", "customer_id": "C002", "status": "processing", "placed": "2026-09-25",
+    {"id": "CC-10455", "customer_id": "C002", "status": "processing", "placed": "2026-09-25",
      "estimated_delivery": "2026-10-01", "delivered": null, "shipping_cost": 0.00,
      "shipping_address": "2150 Pearl St, Boulder, CO 80302",
      "items": [
        {"line_id": "L1", "sku": "JKT-CSC", "qty": 1, "unit_price": 189.00, "status": "processing", "size": "M"}
      ]},
-    {"id": "FW-10299", "customer_id": "C002", "status": "delivered", "placed": "2026-09-14",
+    {"id": "CC-10299", "customer_id": "C002", "status": "delivered", "placed": "2026-09-14",
      "estimated_delivery": "2026-09-21", "delivered": "2026-09-20", "shipping_cost": 6.95,
      "shipping_address": "2150 Pearl St, Boulder, CO 80302",
      "items": [
        {"line_id": "L1", "sku": "FTW-BLD-CL", "qty": 1, "unit_price": 99.00, "status": "delivered", "size": "10"}
      ]},
-    {"id": "FW-10460", "customer_id": "C003", "status": "shipped", "placed": "2026-09-17",
+    {"id": "CC-10460", "customer_id": "C003", "status": "shipped", "placed": "2026-09-17",
      "estimated_delivery": "2026-09-24", "delivered": null, "shipping_cost": 0.00,
      "shipping_address": "301 W 108th St Apt 4B, New York, NY 10025",
      "tracking": {"carrier": "UPS", "number": "1Z999AA10123456784", "last_scan": "2026-09-23: Departed facility, Harrisburg, PA", "delay_note": "Carrier weather delay"},
      "items": [
        {"line_id": "L1", "sku": "PCK-ALP55", "qty": 1, "unit_price": 210.00, "status": "shipped"}
      ]},
-    {"id": "FW-10402", "customer_id": "C003", "status": "delivered", "placed": "2026-09-12",
+    {"id": "CC-10402", "customer_id": "C003", "status": "delivered", "placed": "2026-09-12",
      "estimated_delivery": "2026-09-18", "delivered": "2026-09-18", "shipping_cost": 0.00,
      "shipping_address": "301 W 108th St Apt 4B, New York, NY 10025",
      "tracking": {"carrier": "USPS", "number": "9400111899223344556677", "last_scan": "2026-09-18: Delivered, left in parcel locker"},
      "items": [
        {"line_id": "L1", "sku": "SLP-PAD", "qty": 1, "unit_price": 139.00, "status": "delivered"}
      ]},
-    {"id": "FW-10477", "customer_id": "C004", "status": "delivered", "placed": "2026-09-16",
+    {"id": "CC-10477", "customer_id": "C004", "status": "delivered", "placed": "2026-09-16",
      "estimated_delivery": "2026-09-23", "delivered": "2026-09-22", "shipping_cost": 0.00,
      "shipping_address": "1840 N Clark St, Chicago, IL 60614",
      "items": [
        {"line_id": "L1", "sku": "TNT-SUM2", "qty": 1, "unit_price": 689.00, "status": "delivered"}
      ]},
-    {"id": "FW-10490", "customer_id": "C005", "status": "shipped", "placed": "2026-09-23",
+    {"id": "CC-10490", "customer_id": "C005", "status": "shipped", "placed": "2026-09-23",
      "estimated_delivery": "2026-09-29", "delivered": null, "shipping_cost": 0.00,
      "shipping_address": "4512 Fremont Ave N, Seattle, WA 98103",
      "tracking": {"carrier": "FedEx", "number": "771234567890", "last_scan": "2026-09-25: In transit, Portland, OR"},
      "items": [
        {"line_id": "L1", "sku": "SLP-BRZ20", "qty": 1, "unit_price": 159.00, "status": "shipped", "size": "Regular"}
      ]},
-    {"id": "FW-10350", "customer_id": "C005", "status": "delivered", "placed": "2026-08-04",
+    {"id": "CC-10350", "customer_id": "C005", "status": "delivered", "placed": "2026-08-04",
      "estimated_delivery": "2026-08-11", "delivered": "2026-08-10", "shipping_cost": 6.95,
      "shipping_address": "4512 Fremont Ave N, Seattle, WA 98103",
      "items": [
        {"line_id": "L1", "sku": "ACC-POLES", "qty": 1, "unit_price": 119.00, "status": "delivered"}
      ]},
-    {"id": "FW-10501", "customer_id": "C006", "status": "processing", "placed": "2026-09-26",
+    {"id": "CC-10501", "customer_id": "C006", "status": "processing", "placed": "2026-09-26",
      "estimated_delivery": "2026-10-02", "delivered": null, "shipping_cost": 6.95,
      "shipping_address": "712 Moreland Ave NE, Atlanta, GA 30307",
      "items": [
        {"line_id": "L1", "sku": "CK-STV", "qty": 1, "unit_price": 79.00, "status": "processing"},
        {"line_id": "L2", "sku": "CK-FUEL", "qty": 2, "unit_price": 12.00, "status": "processing"}
      ]},
-    {"id": "FW-10412", "customer_id": "C006", "status": "delivered", "placed": "2026-08-27",
+    {"id": "CC-10412", "customer_id": "C006", "status": "delivered", "placed": "2026-08-27",
      "estimated_delivery": "2026-09-02", "delivered": "2026-09-01", "shipping_cost": 0.00,
      "shipping_address": "712 Moreland Ave NE, Atlanta, GA 30307",
      "items": [
@@ -110,7 +110,7 @@
      ]}
   ],
   "existing_returns": [
-    {"return_id": "RMA-5001", "order_id": "FW-10412", "line_ids": ["L1"], "reason": "changed_mind",
+    {"return_id": "RMA-5001", "order_id": "CC-10412", "line_ids": ["L1"], "reason": "changed_mind",
      "refund_amount": 119.00, "status": "awaiting_item", "created": "2026-09-21"}
   ]
 }

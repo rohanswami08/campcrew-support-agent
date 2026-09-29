@@ -27,7 +27,7 @@ MAX_MESSAGES_PER_SESSION = 30
 IP_LIMIT, IP_WINDOW_SECONDS = 20, 5 * 60
 DAILY_MESSAGE_CAP = int(os.environ.get("DAILY_MESSAGE_CAP", "1000"))
 
-app = FastAPI(title="Fernwick Support Agent")
+app = FastAPI(title="CampCrew Support Agent")
 _client = None
 _sessions: dict[str, dict] = {}
 _ip_hits: dict[str, deque] = defaultdict(deque)

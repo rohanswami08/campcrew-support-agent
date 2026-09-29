@@ -47,7 +47,7 @@ def simulate(client, scenario: dict, agent_model: str) -> dict:
     agent = SupportAgent(client, Store(), model=agent_model)
     sim_system = SIM_SYSTEM.format(done=DONE, instructions=scenario["customer"])
     # From the simulator's point of view, the agent is the "user".
-    sim_messages = [{"role": "user", "content": "Hi, thanks for contacting Fernwick support! How can I help?"}]
+    sim_messages = [{"role": "user", "content": "Hi, thanks for contacting CampCrew support! How can I help?"}]
     transcript, replies = [], []
 
     for turn in range(MAX_TURNS):
