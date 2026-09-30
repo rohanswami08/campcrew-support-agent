@@ -2,7 +2,7 @@
 
 A customer-support AI agent for **CampCrew**, a fictional outdoor-gear store. It verifies customers, looks up orders, cancels, changes addresses, starts returns, issues goodwill credit, and hands off to a human when it should. It does all of this by calling real tools against a mock store database, under a written support policy.
 
-**[Live demo](https://YOUR-APP.onrender.com)** · **[2-minute walkthrough video](#)** · Built with Python, FastAPI, and the Claude API
+**[Live demo](https://YOUR-APP.onrender.com)** · **[2-minute walkthrough video](https://youtu.be/9M8S7noJqxM)** · Built with Python, FastAPI, and the Claude API
 
 ![screenshot](docs/screenshot.png)
 
