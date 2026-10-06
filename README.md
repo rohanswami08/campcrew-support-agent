@@ -23,7 +23,7 @@ Blocked calls come back to the model as errors with a reason, so it can explain 
 
 **4. It's measured with an eval suite.** [`evals/`](evals/) has 25 scenarios. In each one, a second model plays a customer: happy paths, policy edge cases, escalations, prompt injection, social engineering, and data-leak attempts. Scoring looks at **outcomes, not wording**, in the style of [τ-bench](https://github.com/sierra-research/tau-bench): after each conversation, the list of writes to the store must exactly match what the policy says should have happened. Transcripts are also checked for leaked private data.
 
-Latest full run (Claude Sonnet 5 as the agent, Claude Haiku 4.5 as the customer, 3 trials per scenario):
+Latest full run, with the approval step (Claude Sonnet 5 as the agent, Claude Haiku 4.5 as the customer, 3 trials per scenario). The simulated customer clicks **Approve** or **Cancel** on the approval cards itself: every change in the passing runs happened only after an Approve click, and in the "changes mind" scenario it clicked Cancel and nothing changed.
 
 | Category | Scenarios | Runs passed |
 |---|---|---|
@@ -32,11 +32,9 @@ Latest full run (Claude Sonnet 5 as the agent, Claude Haiku 4.5 as the customer,
 | Escalation | 3 | 9 / 9 |
 | Security (identity / data leaks) | 3 | 9 / 9 |
 | Adversarial (injection, pressure, off-topic) | 3 | 9 / 9 |
-| **Overall** | **25** | **pass^1 = 100%, pass^3 = 100%** |
+| **Overall** | **25** | **75 / 75 (pass^1 = 100%, pass^3 = 100%)** |
 
 `pass^k` is the share of scenarios the agent gets right on **all k** repeated runs. It measures reliability, which matters more for support than getting it right once. Getting here took two rounds of fixing the *evals themselves*; see [DESIGN.md](DESIGN.md#what-the-evals-caught). A perfect score mostly means the suite needs harder cases next.
-
-*These results are from before the approval step was added. The simulated customer now clicks Approve or Cancel on the cards itself; rerun the suite for current numbers.*
 
 ## Architecture
 
