@@ -55,6 +55,12 @@ class ResetRequest(BaseModel):
     session_id: str = Field(min_length=8, max_length=64)
 
 
+class DecideRequest(BaseModel):
+    session_id: str = Field(min_length=8, max_length=64)
+    proposal_id: str = Field(min_length=1, max_length=16)
+    approve: bool
+
+
 def _client_ip(request: Request) -> str:
     forwarded = request.headers.get("x-forwarded-for")
     return forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "?")
@@ -141,12 +147,35 @@ def chat(req: ChatRequest, request: Request):
         agent: SupportAgent = session["agent"]
         session["count"] += 1
         history_len = len(agent.messages)
+        known_proposals = set(agent.tools.proposals)
         try:
             result = agent.respond(req.message.strip())
         except Exception as e:  # API outage, bad key, etc.
             del agent.messages[history_len:]  # roll back the half-finished turn
+            for pid in set(agent.tools.proposals) - known_proposals:
+                agent.tools.proposals[pid]["status"] = "cancelled"  # its card was never shown
             raise HTTPException(502, f"The agent couldn't respond ({type(e).__name__}). Please try again.")
-        return {"reply": result.reply, "trace": result.trace, "state": _state_snapshot(agent)}
+        return {"reply": result.reply, "trace": result.trace, "proposals": result.proposals,
+                "state": _state_snapshot(agent)}
+
+
+@app.post("/api/decide")
+def decide(req: DecideRequest):
+    """The customer clicked Approve or Cancel. This is the only request that changes an order.
+
+    No model call happens here: the server re-checks the policy and either makes the change or
+    refuses. Each proposal can be decided once, so a double click can't apply a change twice.
+    """
+    with _lock:
+        session = _sessions.get(req.session_id)
+    if session is None or session["agent"] is None:
+        raise HTTPException(404, "This conversation has expired. Hit Reset to start over.")
+    with session["lock"]:
+        session["last_used"] = time.time()
+        agent: SupportAgent = session["agent"]
+        result = agent.decide(req.proposal_id, req.approve)
+        return {"reply": result.reply, "trace": result.trace, "ok": result.trace[0]["output"].get("error") is None,
+                "state": _state_snapshot(agent)}
 
 
 @app.post("/api/reset")

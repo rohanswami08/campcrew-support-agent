@@ -38,6 +38,10 @@ not in your instructions, and never invent problems or complaints your instructi
 When your goal is resolved, or clearly can't be, or the conversation has naturally ended, reply with
 exactly {done} and nothing else.
 
+Sometimes the chat shows an approval card describing a change, with Approve and Cancel buttons. To click
+one, reply with exactly APPROVE or CANCEL and nothing else. Approve only if the card matches what you
+want, following your instructions.
+
 <instructions>
 {instructions}
 </instructions>"""
@@ -60,16 +64,32 @@ def simulate(client, scenario: dict, agent_model: str) -> dict:
         if not customer_msg or DONE in customer_msg:
             break
         sim_messages.append({"role": "assistant", "content": customer_msg})
-        result = agent.respond(customer_msg)
+        pending = agent.tools.pending_proposals()
+        button = customer_msg.strip().strip(".!").upper()
+        if pending and button in ("APPROVE", "CANCEL"):
+            # The simulated customer clicked a button on the oldest open approval card.
+            result = agent.decide(pending[0]["id"], approve=(button == "APPROVE"))
+        else:
+            result = agent.respond(customer_msg)
         replies.append(result.reply)
         transcript.append({"customer": customer_msg, "agent": result.reply,
                            "tools": [{"tool": t["tool"], "input": t["input"],
                                       "error": t["output"].get("error")} for t in result.trace]})
-        sim_messages.append({"role": "user", "content": result.reply or "(no reply)"})
+        sim_messages.append({"role": "user", "content": _as_seen_by_customer(result.reply, agent)})
 
     passed, problems = check(scenario, agent.store.actions, replies)
     return {"id": scenario["id"], "category": scenario["category"], "passed": passed,
             "problems": problems, "actions": agent.store.actions, "transcript": transcript}
+
+
+def _as_seen_by_customer(reply: str, agent: SupportAgent) -> str:
+    """The agent's reply plus any open approval card, described the way the customer sees it."""
+    text = reply or "(no reply)"
+    pending = agent.tools.pending_proposals()
+    if pending:
+        text += (f'\n\n[Approval card on screen: "{pending[0]["summary"]}" with buttons Approve and Cancel. '
+                 "Reply with exactly APPROVE or CANCEL to click one, or type a message instead.]")
+    return text
 
 
 def main() -> None:

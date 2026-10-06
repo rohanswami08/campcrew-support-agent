@@ -84,6 +84,56 @@ function renderState(state) {
   }
 }
 
+// Approval card: shows the exact change the agent proposed. Nothing happens on the
+// server until the customer clicks Approve; Cancel discards it.
+function addApprovalCard(proposal) {
+  const wrap = document.createElement("div");
+  wrap.className = "msg agent approval";
+  wrap.innerHTML = `<div class="card">
+      <div class="card-label">Approval needed</div>
+      <div class="card-summary"></div>
+      <div class="card-actions">
+        <button type="button" class="approve">Approve</button>
+        <button type="button" class="cancel">Cancel</button>
+      </div>
+      <div class="card-note">Nothing changes unless you approve.</div>
+    </div>`;
+  wrap.querySelector(".card-summary").textContent = proposal.summary;
+  const buttons = wrap.querySelectorAll("button");
+  buttons.forEach((b) => b.addEventListener("click", () => decide(proposal.id, b.classList.contains("approve"), wrap)));
+  messagesEl.appendChild(wrap);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+async function decide(proposalId, approve, cardEl) {
+  if (busy) return;
+  busy = true;
+  cardEl.querySelectorAll("button").forEach((b) => (b.disabled = true));  // one click only
+  const note = cardEl.querySelector(".card-note");
+  note.textContent = approve ? "Approving…" : "Cancelling…";
+  try {
+    const res = await fetch("/api/decide", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sessionId, proposal_id: proposalId, approve }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Something went wrong.");
+    cardEl.classList.add(data.ok ? (approve ? "approved" : "cancelled") : "failed");
+    note.textContent = data.ok ? (approve ? "✓ Approved" : "Cancelled. No change made.") : "Not completed";
+    cardEl.querySelector(".card-actions").remove();
+    addMessage("agent", data.reply);
+    renderTrace(data.trace);
+    renderState(data.state);
+    if (data.state.accounts) renderAccounts(data.state.accounts);
+  } catch (err) {
+    note.textContent = err.message;
+    cardEl.querySelectorAll("button").forEach((b) => (b.disabled = false));
+  } finally {
+    busy = false;
+  }
+}
+
 async function send(text) {
   if (busy || !text.trim()) return;
   busy = true; sendBtn.disabled = true; statusEl.textContent = "";
@@ -102,6 +152,7 @@ async function send(text) {
     if (!res.ok) throw new Error(data.detail || "Something went wrong.");
     addMessage("agent", data.reply || "(no reply)");
     addToolsUsed(data.trace);
+    (data.proposals || []).forEach(addApprovalCard);
     renderTrace(data.trace);
     renderState(data.state);
     if (data.state.accounts) renderAccounts(data.state.accounts);

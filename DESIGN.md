@@ -4,9 +4,17 @@
 
 **Policy in the prompt *and* in code.** The prompt alone isn't a guarantee: a model can be talked into things, or just make a mistake. Code alone makes the agent unhelpful, because it can't explain rules it doesn't know. So the model gets the full policy to reason with, and every write tool re-checks the rules. Tool errors carry a human-readable reason, so a blocked action turns into a clear explanation for the customer instead of a dead end.
 
-**Identity = email + ZIP.** It's simple enough for a demo and still forces the agent through an explicit verification step. After 3 failed attempts in a conversation, verification locks and the agent is told to offer a human. Another customer's order returns the *same* error as an order that doesn't exist, so the agent can't be used to confirm that an order number or person exists.
+**Identity = email + ZIP.** This is a demo check, not real authentication: anyone who knows both can act as that customer. It's simple enough for a demo and still forces the agent through an explicit verification step. After 3 failed attempts in a conversation, verification locks and the agent is told to offer a human. Another customer's order returns the *same* error as an order that doesn't exist, so the agent can't be used to confirm that an order number or person exists.
 
-**Confirmation before actions is prompt-level only.** I considered a `confirmed: true` parameter on write tools. It would be theater, because the model fills in that parameter itself. A real version would put confirmation in the UI (an "Approve" button the customer clicks), which the model can't fake.
+**Changes need the customer's click, not the model's word.** My first version only *asked* the model to confirm before acting, and I rejected a `confirmed: true` tool parameter as theater, since the model fills it in itself. Now the four change tools only create a *proposal*. The server writes the exact change in plain words, the customer sees it on a card with Approve / Cancel buttons, and only `POST /api/decide` (a button click, which the model can't make) carries it out. On Approve, the server:
+- checks the proposal is still pending, and marks it approved *before* acting, so a second click does nothing;
+- checks that the same customer is still the one verified;
+- runs `check_policy()` again against the store as it is now (the order may have shipped, or a credit may already have been issued from another card);
+- only then changes the store.
+
+The confirmation message after a click is written by code, not the model, so the customer is told exactly what happened. Escalating to a human stays immediate: it moves no money and changes no order.
+
+**All rules in one function.** Ownership, timing, return windows, the $500 refund cap and the $15 credit cap all live in `check_policy()` in `agent/policy.py`, with a comment listing each rule. Tools call it to propose a change and the approval endpoint calls it again before acting, so there's one place to read and test the policy.
 
 **One fresh store per conversation.** Demo visitors can't affect each other, and each eval starts from the same known state, which makes outcome-based grading possible.
 
@@ -41,7 +49,8 @@
 
 ## What I'd build next
 
-- Customer-side approval buttons for irreversible actions
+- Real authentication (a signed-in session or a one-time email code) instead of email + ZIP
+- Independent approval for high-risk changes, e.g. a human signs off on large refunds
 - Streaming responses
 - An LLM-judge rubric for tone and clarity
 - Human-handoff inbox that shows escalated tickets with the full transcript

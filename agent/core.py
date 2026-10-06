@@ -1,5 +1,8 @@
 """The agent loop: send the conversation to Claude, run any tools it asks for,
-feed the results back, and repeat until it answers the customer in text."""
+feed the results back, and repeat until it answers the customer in text.
+
+Changes the agent proposes are carried out only by `decide()`, which the web app
+calls when the customer clicks Approve or Cancel on the approval card."""
 
 from __future__ import annotations
 
@@ -19,6 +22,7 @@ MAX_TOOL_ROUNDS = 8
 class TurnResult:
     reply: str
     trace: list[dict] = field(default_factory=list)  # tool calls + results, for the UI and evals
+    proposals: list[dict] = field(default_factory=list)  # approval cards to show: [{id, summary}]
 
 
 class SupportAgent:
@@ -50,7 +54,7 @@ class SupportAgent:
             tool_calls = [b for b in content if b["type"] == "tool_use"]
             if not tool_calls:
                 text = "".join(b["text"] for b in content if b["type"] == "text").strip()
-                return TurnResult(reply=text, trace=trace)
+                return TurnResult(reply=text, trace=trace, proposals=self._new_proposals(trace))
 
             results = []
             for call in tool_calls:
@@ -68,7 +72,48 @@ class SupportAgent:
         fallback = ("Sorry, I'm having trouble with that request. I can connect you with a specialist "
                     "if you'd like.")
         self.messages.append({"role": "assistant", "content": fallback})
-        return TurnResult(reply=fallback, trace=trace)
+        return TurnResult(reply=fallback, trace=trace, proposals=self._new_proposals(trace))
+
+    def decide(self, proposal_id: str, approve: bool) -> TurnResult:
+        """The customer clicked Approve or Cancel on an approval card.
+
+        The reply is written by code, not the model, so the customer is told exactly what
+        happened. The outcome is also added to the conversation so the agent knows about it.
+        """
+        outcome = self.tools.decide(proposal_id, approve)
+        summary = outcome.get("summary", "that request")
+        if not outcome["ok"]:
+            reply = f"I couldn't do that: {outcome['error']}"
+        elif outcome["status"] == "cancelled":
+            reply = "No problem, I didn't make that change. Is there anything else I can help with?"
+        else:
+            reply = _done_message(outcome["action"], outcome["result"])
+        clicked = "Approve" if approve else "Cancel"
+        note = (f"[The customer clicked {clicked} on proposal {proposal_id} ({summary}). "
+                f"Outcome: {json.dumps(outcome)}]")
+        self.messages.append({"role": "user", "content": note})
+        self.messages.append({"role": "assistant", "content": reply})
+        trace = [{"tool": f"customer clicked {clicked}", "input": {"proposal_id": proposal_id, "summary": summary},
+                  "output": outcome if outcome["ok"] else {"error": outcome["error"]}}]
+        return TurnResult(reply=reply, trace=trace)
+
+    def _new_proposals(self, trace: list[dict]) -> list[dict]:
+        ids = {t["output"].get("proposal_id") for t in trace if isinstance(t["output"], dict)}
+        return [p for p in self.tools.pending_proposals() if p["id"] in ids]
+
+
+def _done_message(action: str, r: dict) -> str:
+    if action == "cancel_order":
+        return (f"Done. Order {r['order_id']} is cancelled, and ${r['refund_amount']:.2f} is being refunded "
+                "to your original payment method.")
+    if action == "update_shipping_address":
+        return f"Done. Order {r['order_id']} will now ship to {r['shipping_address']}."
+    if action == "start_return":
+        return (f"Done. Your return {r['return_id']} is open, and ${r['refund_amount']:.2f} will be refunded once "
+                f"we receive the item. Print your label here: {r['label_url']}")
+    if action == "issue_goodwill_credit":
+        return f"Done. A ${r['amount']:.2f} store credit has been added to your account."
+    return "Done."
 
 
 def _block_to_dict(block) -> dict:

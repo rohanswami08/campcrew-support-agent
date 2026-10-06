@@ -34,13 +34,19 @@ def test_agent_runs_tools_then_answers():
     client = FakeClient([
         [tool_use("t1", "verify_customer", {"email": "jordan.alvarez@example.com", "zip_code": "80302"})],
         [tool_use("t2", "cancel_order", {"order_id": "CC-10455", "reason": "customer request"})],
-        [text("Done! Your order is cancelled.")],
+        [text("Please review the card and click Approve.")],
     ])
     agent = SupportAgent(client, Store(), model="test")
     result = agent.respond("cancel my jacket, jordan.alvarez@example.com 80302")
-    assert result.reply == "Done! Your order is cancelled."
     assert [t["tool"] for t in result.trace] == ["verify_customer", "cancel_order"]
+    # the tool only proposed the change: an approval card, no change yet
+    assert [p["id"] for p in result.proposals] == ["P1"]
+    assert agent.store.actions == []
+    approved = agent.decide("P1", approve=True)
+    assert approved.reply.startswith("Done. Order CC-10455 is cancelled, and $189.00")
     assert agent.store.actions[0]["type"] == "cancel_order"
+    # the outcome is recorded in the conversation so the model knows about it
+    assert "clicked Approve" in agent.messages[-2]["content"]
     # tool results are sent back to the model with matching ids
     last_user = client.requests[-1]["messages"][-1]
     assert last_user["content"][0]["tool_use_id"] == "t2"
@@ -109,7 +115,11 @@ def test_sidebar_reflects_this_conversation(monkeypatch):
     start = {a["name"]: a for a in c.get("/api/demo-accounts").json()["accounts"]}
     assert start["Jordan Alvarez"]["orders"][0] == {"id": "CC-10455", "status": "processing", "changed": False}
 
-    state = c.post("/api/chat", json={"session_id": "session-sidebar", "message": "yes cancel"}).json()["state"]
+    chat = c.post("/api/chat", json={"session_id": "session-sidebar", "message": "yes cancel"}).json()
+    jordan = next(a for a in chat["state"]["accounts"] if a["name"] == "Jordan Alvarez")
+    assert jordan["orders"][0]["status"] == "processing"            # proposed, not done
+    state = c.post("/api/decide", json={"session_id": "session-sidebar", "proposal_id": chat["proposals"][0]["id"],
+                                        "approve": True}).json()["state"]
     jordan = next(a for a in state["accounts"] if a["name"] == "Jordan Alvarez")
     assert jordan["orders"][0] == {"id": "CC-10455", "status": "cancelled", "changed": True}
     assert not any(o["changed"] for a in state["accounts"] if a["name"] != "Jordan Alvarez" for o in a["orders"])
@@ -125,3 +135,61 @@ def test_web_app_without_key_returns_503(monkeypatch):
     c = TestClient(webapp.app)
     r = c.post("/api/chat", json={"session_id": "session-nokey", "message": "hello"})
     assert r.status_code == 503
+
+
+def _credit_chat(monkeypatch, session_id):
+    """Priya's late order: the agent proposes a $15 credit. Returns (client, proposal_id)."""
+    import app as webapp
+
+    fake = FakeClient([
+        [tool_use("t1", "verify_customer", {"email": "priya.n@example.com", "zip_code": "10025"})],
+        [tool_use("t2", "issue_goodwill_credit", {"order_id": "CC-10460", "amount": 15, "reason": "late"})],
+        [text("I've put a $15 credit on the screen for you to approve.")],
+    ])
+    monkeypatch.setattr(webapp, "get_client", lambda: fake)
+    c = TestClient(webapp.app)
+    data = c.post("/api/chat", json={"session_id": session_id, "message": "my backpack is late"}).json()
+    assert data["proposals"][0]["summary"].startswith("Add a $15.00 store credit")
+    assert data["state"]["actions"] == []
+    return c, data["proposals"][0]["id"]
+
+
+def test_api_cancel_makes_no_change(monkeypatch):
+    c, pid = _credit_chat(monkeypatch, "session-cancel")
+    out = c.post("/api/decide", json={"session_id": "session-cancel", "proposal_id": pid, "approve": False}).json()
+    assert out["ok"] and "didn't make that change" in out["reply"]
+    assert out["state"]["actions"] == []
+
+
+def test_api_double_approve_issues_one_credit(monkeypatch):
+    c, pid = _credit_chat(monkeypatch, "session-double")
+    body = {"session_id": "session-double", "proposal_id": pid, "approve": True}
+    first, second = c.post("/api/decide", json=body).json(), c.post("/api/decide", json=body).json()
+    assert first["ok"] and not second["ok"]
+    assert [a["type"] for a in second["state"]["actions"]] == ["goodwill_credit"]
+
+
+def test_api_cannot_approve_from_another_session(monkeypatch):
+    c, pid = _credit_chat(monkeypatch, "session-owner")
+    r = c.post("/api/decide", json={"session_id": "session-stranger", "proposal_id": pid, "approve": True})
+    assert r.status_code == 404
+
+
+def test_eval_customer_can_click_buttons():
+    """The simulated customer's APPROVE reply clicks the card instead of being sent as a message."""
+    from evals.run_evals import simulate
+
+    client = FakeClient([
+        [text("Hi, cancel my jacket please. jordan.alvarez@example.com 80302")],       # customer
+        [tool_use("t1", "verify_customer", {"email": "jordan.alvarez@example.com", "zip_code": "80302"})],
+        [tool_use("t2", "cancel_order", {"order_id": "CC-10455", "reason": "found locally"})],
+        [text("Please review the card and click Approve.")],                           # agent
+        [text("APPROVE")],                                                             # customer clicks
+        [text("###DONE###")],
+    ])
+    scenario = {"id": "x", "category": "happy_path", "customer": "...",
+                "expected_actions": [{"type": "cancel_order", "order_id": "CC-10455"}]}
+    run = simulate(client, scenario, "test")
+    assert run["passed"], run["problems"]
+    # the customer saw the exact card text
+    assert "Approval card on screen" in client.requests[4]["messages"][-1]["content"]

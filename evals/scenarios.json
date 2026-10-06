@@ -247,7 +247,7 @@
   {
     "id": "changes_mind_midway",
     "category": "happy_path",
-    "customer": "You are Jordan Alvarez (email jordan.alvarez@example.com, ZIP 80302). Ask to cancel your rain jacket order. When the agent asks you to confirm, say 'actually wait, never mind, I'll keep it.' Then end politely.",
+    "customer": "You are Jordan Alvarez (email jordan.alvarez@example.com, ZIP 80302). Ask to cancel your rain jacket order. When the approval card for the cancellation appears, change your mind: click CANCEL. Then say you'll keep it and end politely.",
     "expected_actions": []
   },
   {

@@ -139,3 +139,23 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.6px; color: v
   .topbar { padding: 12px 16px; }
   .brand-sub { display: none; }
 }
+
+/* Approval card: the customer approves the exact change before anything happens */
+.approval .card {
+  max-width: 78%; border: 2px solid var(--accent); border-radius: 14px; padding: 12px 14px;
+  background: var(--surface); display: flex; flex-direction: column; gap: 8px;
+}
+.card-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--accent); }
+.card-summary { font-weight: 600; }
+.card-actions { display: flex; gap: 8px; }
+.card-actions button {
+  border-radius: 9px; padding: 7px 16px; font: inherit; font-weight: 600; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+}
+.card-actions .approve { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.card-actions button:disabled { opacity: 0.5; cursor: default; }
+.card-note { font-size: 12px; color: var(--muted); }
+.approval.approved .card { border-color: var(--border); }
+.approval.approved .card-note { color: var(--accent); font-weight: 600; }
+.approval.cancelled .card, .approval.failed .card { border-color: var(--border); opacity: 0.8; }
+.approval.failed .card-note { color: var(--error); font-weight: 600; }

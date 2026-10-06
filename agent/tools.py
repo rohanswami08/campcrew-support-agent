@@ -1,25 +1,30 @@
-"""Tools the agent can call, plus the code-level guardrails behind them.
+"""Tools the agent can call.
 
-Design choice: the policy is written in the system prompt *and* enforced here.
-The prompt teaches the model what to do; these checks guarantee that even a
-confused or manipulated model can't cancel a shipped order, refund someone
-else's order, or hand out a $500 credit. When a check fails, the tool returns
-an error with the reason so the model can explain it to the customer.
+Read-only tools (verify, look up orders, search products) run immediately.
+
+Tools that would change something (cancel, change address, start a return,
+issue credit) never change anything themselves. They run check_policy() and,
+if it passes, create a *proposal*: an exact description of the change that the
+customer sees on an Approve / Cancel card. The change happens only in
+`decide()`, after the customer clicks Approve, and only if check_policy()
+passes again at that moment.
+
+Escalating to a human is the one write that happens right away: it moves no
+money and changes no order, it only opens a ticket.
 """
 
 from __future__ import annotations
 
 from datetime import date
 
+from .policy import RETURN_REASONS, PolicyViolation, check_policy
 from .store import Store
 
-CHANGED_MIND_WINDOW_DAYS = 30
-WARRANTY_WINDOW_DAYS = 365
-MAX_AUTO_REFUND = 500.00
-MAX_GOODWILL_CREDIT = 15.00
-RETURN_REASONS = ("changed_mind", "defective", "wrong_item")
 ESCALATION_CATEGORIES = ("refund_over_limit", "lost_package", "customer_request", "other")
+CHANGE_ACTIONS = ("cancel_order", "update_shipping_address", "start_return", "issue_goodwill_credit")
 
+_PROPOSES = ("Does NOT make the change: it shows the customer an approval card with the exact change and "
+             "Approve / Cancel buttons. Nothing happens unless they click Approve.")
 
 TOOL_SCHEMAS: list[dict] = [
     {
@@ -62,8 +67,7 @@ TOOL_SCHEMAS: list[dict] = [
     },
     {
         "name": "cancel_order",
-        "description": "Cancel an entire order that has not shipped yet. Only call after the customer has "
-                       "explicitly confirmed.",
+        "description": "Propose cancelling an entire order that has not shipped yet. " + _PROPOSES,
         "input_schema": {
             "type": "object",
             "properties": {
@@ -75,8 +79,8 @@ TOOL_SCHEMAS: list[dict] = [
     },
     {
         "name": "update_shipping_address",
-        "description": "Change the shipping address of an order that has not shipped yet. Only call after "
-                       "the customer has explicitly confirmed the full new address.",
+        "description": "Propose changing the shipping address of an order that has not shipped yet. "
+                       "Get the full new address first. " + _PROPOSES,
         "input_schema": {
             "type": "object",
             "properties": {
@@ -88,8 +92,7 @@ TOOL_SCHEMAS: list[dict] = [
     },
     {
         "name": "start_return",
-        "description": "Start a return for one or more delivered items on an order and generate a return "
-                       "label. Only call after the customer has explicitly confirmed.",
+        "description": "Propose a return for one or more delivered items on an order. " + _PROPOSES,
         "input_schema": {
             "type": "object",
             "properties": {
@@ -103,8 +106,8 @@ TOOL_SCHEMAS: list[dict] = [
     },
     {
         "name": "issue_goodwill_credit",
-        "description": "Issue a one-time store credit (max $15) on an order that is past its estimated "
-                       "delivery date. Only call after the customer has accepted the offer.",
+        "description": "Propose a one-time store credit (max $15) on an order that is past its estimated "
+                       "delivery date. " + _PROPOSES,
         "input_schema": {
             "type": "object",
             "properties": {
@@ -117,8 +120,9 @@ TOOL_SCHEMAS: list[dict] = [
     },
     {
         "name": "escalate_to_human",
-        "description": "Open a ticket for a human specialist. Use for refunds over $500, packages marked "
-                       "delivered but not received, explicit requests for a human, or anything outside policy.",
+        "description": "Open a ticket for a human specialist (takes effect immediately). Use for refunds over "
+                       "$500, packages marked delivered but not received, explicit requests for a human, or "
+                       "anything outside policy.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -133,28 +137,97 @@ TOOL_SCHEMAS: list[dict] = [
 
 
 class ToolError(Exception):
-    """A policy or validation failure, reported back to the model."""
+    """A validation failure, reported back to the model."""
 
 
 class ToolExecutor:
-    """Runs tool calls for one conversation. Holds who has been verified."""
+    """Runs tool calls for one conversation. Holds who is verified and the pending proposals."""
 
     def __init__(self, store: Store):
         self.store = store
         self.verified_customer_id: str | None = None
         self._failed_verifications = 0
+        self.proposals: dict[str, dict] = {}   # proposal_id -> proposal
+        self._next_proposal = 1
 
-    # ---------- entry point ----------
+    # ---------- entry point for the model ----------
     def run(self, name: str, args: dict) -> dict:
+        if name in CHANGE_ACTIONS:
+            return self._propose(name, args)
         handler = getattr(self, f"_tool_{name}", None)
         if handler is None:
             return {"error": f"Unknown tool: {name}"}
         try:
             return handler(**args)
-        except ToolError as e:
+        except (ToolError, PolicyViolation) as e:
             return {"error": str(e)}
         except TypeError as e:  # wrong/missing arguments from the model
             return {"error": f"Invalid arguments: {e}"}
+
+    # ---------- proposals and approval ----------
+    def _propose(self, action: str, args: dict) -> dict:
+        """Check the policy and, if it passes, create a proposal for the customer to approve."""
+        try:
+            plan = check_policy(self.store, self.verified_customer_id, action, args)
+        except PolicyViolation as e:
+            return {"error": str(e)}
+        pid = f"P{self._next_proposal}"
+        self._next_proposal += 1
+        self.proposals[pid] = {
+            "id": pid, "action": action, "args": dict(args), "summary": plan.summary,
+            "customer_id": self.verified_customer_id, "status": "pending",
+        }
+        return {
+            "status": "awaiting_customer_approval",
+            "proposal_id": pid,
+            "summary": plan.summary,
+            "note": "Nothing has changed yet. The customer now sees this exact change with Approve and Cancel "
+                    "buttons. Ask them to review it; do not say it is done.",
+        }
+
+    def pending_proposals(self) -> list[dict]:
+        return [{"id": p["id"], "summary": p["summary"]} for p in self.proposals.values() if p["status"] == "pending"]
+
+    def decide(self, proposal_id: str, approve: bool) -> dict:
+        """Called when the customer clicks Approve or Cancel. The only path that changes an order.
+
+        - A proposal can be decided once. Clicking Approve twice does nothing the second time.
+        - On Approve, the policy is checked again against the store as it is *now*, by the
+          customer verified *now*, before anything changes.
+        """
+        p = self.proposals.get(proposal_id)
+        if p is None:
+            return {"ok": False, "error": "That request wasn't found."}
+        if p["status"] != "pending":
+            return {"ok": False, "error": f"That request was already {p['status']}.", "summary": p["summary"]}
+
+        if not approve:
+            p["status"] = "cancelled"
+            return {"ok": True, "status": "cancelled", "summary": p["summary"]}
+
+        p["status"] = "approved"  # claim it before doing anything, so it can never run twice
+        try:
+            if self.verified_customer_id != p["customer_id"]:
+                raise PolicyViolation("The verified customer changed since this was proposed.")
+            plan = check_policy(self.store, self.verified_customer_id, p["action"], p["args"])
+        except PolicyViolation as e:
+            p["status"] = "blocked"
+            return {"ok": False, "error": str(e), "summary": p["summary"]}
+        result = self._execute(plan)
+        return {"ok": True, "status": "approved", "action": p["action"], "summary": p["summary"], "result": result}
+
+    def _execute(self, plan) -> dict:
+        s, a = self.store, plan.params
+        if plan.action == "cancel_order":
+            return s.cancel_order(plan.order_id, a["reason"])
+        if plan.action == "update_shipping_address":
+            return s.update_address(plan.order_id, a["address"])
+        if plan.action == "start_return":
+            return s.create_return(plan.order_id, a["line_ids"], a["reason"], a["refund"])
+        if plan.action == "issue_goodwill_credit":
+            order = s.orders[plan.order_id]
+            return s.add_credit(order["customer_id"], plan.order_id, a["amount"], a["reason"])
+        raise ValueError(plan.action)
 
     # ---------- helpers ----------
     def _require_verified(self) -> str:
@@ -163,11 +236,7 @@ class ToolExecutor:
         return self.verified_customer_id
 
     def _own_order(self, order_id: str) -> dict:
-        """Return the order only if it belongs to the verified customer.
-
-        Orders belonging to someone else get the same 'not found' message as
-        orders that don't exist, so the agent can't leak their existence.
-        """
+        """Return the order only if it belongs to the verified customer (same rule as check_policy)."""
         cid = self._require_verified()
         order = self.store.orders.get(order_id.strip().upper())
         if order is None or order["customer_id"] != cid:
@@ -187,7 +256,7 @@ class ToolExecutor:
             view["size"] = item["size"]
         return view
 
-    # ---------- tools ----------
+    # ---------- read-only tools ----------
     def _tool_verify_customer(self, email: str, zip_code: str) -> dict:
         if self._failed_verifications >= 3:
             raise ToolError("Too many failed verification attempts in this conversation. "
@@ -224,6 +293,8 @@ class ToolExecutor:
             "items": [self._item_view(i) for i in o["items"]],
             "open_returns": [r for r in self.store.returns if r["order_id"] == o["id"]],
             "goodwill_credit_issued": any(c["order_id"] == o["id"] for c in self.store.credits),
+            "pending_approvals": [p["summary"] for p in self.proposals.values()
+                                  if p["status"] == "pending" and p["args"].get("order_id", "").upper() == o["id"]],
             "today": today.isoformat(),
         }
         if "tracking" in o:
@@ -244,80 +315,7 @@ class ToolExecutor:
             for _, p in scored[:5]
         ]}
 
-    def _tool_cancel_order(self, order_id: str, reason: str) -> dict:
-        o = self._own_order(order_id)
-        if o["status"] != "processing":
-            raise ToolError(f"Order {o['id']} is '{o['status']}' and can't be cancelled. "
-                            "Only orders that haven't shipped can be cancelled.")
-        return self.store.cancel_order(o["id"], reason)
-
-    def _tool_update_shipping_address(self, order_id: str, new_address: str) -> dict:
-        o = self._own_order(order_id)
-        if o["status"] != "processing":
-            raise ToolError(f"Order {o['id']} is '{o['status']}'; the address can only be changed before it ships.")
-        if len(new_address.strip()) < 10:
-            raise ToolError("Address looks incomplete. Get the full street, city, state and ZIP.")
-        return self.store.update_address(o["id"], new_address.strip())
-
-    def _tool_start_return(self, order_id: str, line_ids: list[str], reason: str) -> dict:
-        o = self._own_order(order_id)
-        if reason not in RETURN_REASONS:
-            raise ToolError(f"reason must be one of {RETURN_REASONS}")
-        if not line_ids:
-            raise ToolError("Specify at least one line_id to return.")
-        items = {i["line_id"]: i for i in o["items"]}
-        days = self._days_since_delivery(o)
-        if days is None:
-            raise ToolError(f"Order {o['id']} hasn't been delivered, so nothing on it can be returned yet.")
-
-        refund = 0.0
-        for lid in set(line_ids):
-            item = items.get(lid)
-            if item is None:
-                raise ToolError(f"No line {lid} on order {o['id']}.")
-            name = self.store.products[item["sku"]]["name"]
-            if item["status"] != "delivered":
-                raise ToolError(f"{name} ({lid}) is '{item['status']}' and can't be returned again.")
-            final_sale = self.store.products[item["sku"]]["final_sale"]
-            if reason == "changed_mind":
-                if final_sale:
-                    raise ToolError(f"{name} is a final-sale item. It can only be returned if defective or wrong.")
-                if days > CHANGED_MIND_WINDOW_DAYS:
-                    raise ToolError(f"{name} was delivered {days} days ago; changed-mind returns are only "
-                                    f"accepted within {CHANGED_MIND_WINDOW_DAYS} days.")
-            elif days > WARRANTY_WINDOW_DAYS:
-                raise ToolError(f"{name} was delivered {days} days ago, outside the "
-                                f"{WARRANTY_WINDOW_DAYS}-day warranty window.")
-            refund += item["unit_price"] * item["qty"]
-
-        if reason in ("defective", "wrong_item"):
-            already_refunded_shipping = any(
-                r["order_id"] == o["id"] and r["reason"] in ("defective", "wrong_item") for r in self.store.returns)
-            if not already_refunded_shipping:
-                refund += o["shipping_cost"]
-        refund = round(refund, 2)
-
-        if refund > MAX_AUTO_REFUND:
-            raise ToolError(f"This refund would be ${refund:.2f}, over the ${MAX_AUTO_REFUND:.0f} limit for "
-                            "automatic returns. Do not start it; escalate to a human with category "
-                            "'refund_over_limit'.")
-        return self.store.create_return(o["id"], list(set(line_ids)), reason, refund)
-
-    def _tool_issue_goodwill_credit(self, order_id: str, amount: float, reason: str) -> dict:
-        o = self._own_order(order_id)
-        eta = date.fromisoformat(o["estimated_delivery"])
-        arrived = date.fromisoformat(o["delivered"]) if o.get("delivered") else None
-        is_late = (arrived is not None and arrived > eta) or (arrived is None and self.store.today > eta
-                                                             and o["status"] != "cancelled")
-        if not is_late:
-            raise ToolError(f"Order {o['id']} is not late (estimated {o['estimated_delivery']}), "
-                            "so it isn't eligible for a goodwill credit.")
-        if any(c["order_id"] == o["id"] for c in self.store.credits):
-            raise ToolError(f"A goodwill credit was already issued on {o['id']}.")
-        if not 0 < amount <= MAX_GOODWILL_CREDIT:
-            raise ToolError(f"Goodwill credit must be between $0 and ${MAX_GOODWILL_CREDIT:.0f}.")
-        return self.store.add_credit(o["customer_id"], o["id"], round(amount, 2), reason)
-
+    # ---------- the one immediate write ----------
     def _tool_escalate_to_human(self, category: str, summary: str, order_id: str | None = None) -> dict:
         if category not in ESCALATION_CATEGORIES:
             raise ToolError(f"category must be one of {ESCALATION_CATEGORIES}")
